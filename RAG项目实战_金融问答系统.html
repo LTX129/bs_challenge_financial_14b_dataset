@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="zh-CN">
+ <head> 
+  <meta charset="utf-8"> 
+  <link rel="canonical" href="https://blog.csdn.net/CSBLOG/article/details/145877728"> 
+  <meta http-equiv="content-type" content="text/html; charset=utf-8"> 
+  <meta name="renderer" content="webkit"> 
+  <meta name="force-rendering" content="webkit"> 
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"> 
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no"> 
+  <meta name="report" content="{&quot;pid&quot;: &quot;blog&quot;, &quot;spm&quot;:&quot;1001.2101&quot;}"> 
+  <meta name="referrer" content="always"> 
+  <meta http-equiv="Cache-Control" content="no-siteapp">
+  <link rel="alternate" media="handheld" href="#">  
+  <meta name="applicable-device" content="pc"> 
+  <link href="https://g.csdnimg.cn/static/logo/favicon32.ico" rel="shortcut icon" type="image/x-icon"> 
+  <title>RAG项目实战：金融问答系统_基于rag的金融问答系统-CSDN博客</title>   
+  <meta name="keywords" content="基于rag的金融问答系统"> 
+  <meta name="csdn-baidu-search" content="{&quot;autorun&quot;:true,&quot;install&quot;:true,&quot;keyword&quot;:&quot;基于rag的金融问答系统&quot;}"> 
+  <meta name="description" content="文章浏览阅读1.4k次，点赞25次，收藏23次。Step 1：创建一个 ChromaDB 类，封装基础的Chroma连接、插入和检索；Step2：实现 PDFProcessor 类，该类调用 ChromaDB 类的插入函数，将批量读取的PDF文件进行切分后保存至向量库；Step3：实现 RAGManager 类，该类封装了RAG的检索链，并定义检索参数；Step4：实现一个测试函数，用于测试RAG的检索功能。_基于rag的金融问答系统"> 
+  <link rel="stylesheet" type="text/css" href="https://csdnimg.cn/release/blogv2/dist/pc/css/detail_enter-c607d10010.min.css">  
+  <link rel="stylesheet" type="text/css" href="https://csdnimg.cn/release/blogv2/dist/pc/themesSkin/skin-number/skin-number-2c93789924.min.css">    
+  <meta name="toolbar" content="{&quot;type&quot;:&quot;0&quot;,&quot;fixModel&quot;:&quot;1&quot;}">    
+  <link rel="stylesheet" type="text/css" href="https://csdnimg.cn/public/sandalstrap/1.4/css/sandalstrap.min.css"> 
+  <style>
+        .MathJax, .MathJax_Message, .MathJax_Preview{
+            display: none
+        }
+    </style>      
+ 	<style>
+	main div.blog-content-box pre {
+		max-height: 100%;
+		overflow-y: hidden;
+	}
+	</style>
+ </head>  
+ <body class="nodata  " style=""> 
+  <div id="toolbarBox" style="min-height: 48px;"></div>    
+  <link rel="stylesheet" href="https://csdnimg.cn/release/blogv2/dist/pc/css/blog_code-01256533b5.min.css"> 
+  <link rel="stylesheet" href="https://csdnimg.cn/release/blogv2/dist/mdeditor/css/editerView/chart-3456820cac.css"> 
+  <link rel="stylesheet" href="https://g.csdnimg.cn/lib/swiper/6.0.4/css/swiper.css">   
+  <div class="main_father clearfix d-flex justify-content-center mainfather-concision" style="height:100%;"> 
+   <div class="container clearfix container-concision" id="mainBox">  
+    <main>  
+     <div class="blog-content-box"> 
+      <div class="article-header-box"> 
+       <div class="article-header"> 
+        <div class="article-title-box"> 
+         <h1 class="title-article" id="articleContentId">RAG项目实战：金融问答系统</h1> 
+        </div> 
+        <div class="article-info-box"> 
+         <div class="article-bar-top-box"> 
+          <div class="article-bar-top"> 
+           <img class="article-type-img" src="https://csdnimg.cn/release/blogv2/dist/pc/img/original.png" alt=""> 
+           <div class="bar-content"> 
+            <a href="https://mall.csdn.net/vip" data-report-query="spm=3001.10404" data-report-click="{&quot;spm&quot;:&quot;3001.10404&quot;}" data-report-view="{&quot;spm&quot;:&quot;3001.10404&quot;}" class="article-vip-box" target="_blank"><img class="article-vip-img-new" src="https://csdnimg.cn/release/blogv2/dist/pc/img/identityVipNew.png" alt=""></a> 
+            <a class="follow-nickName " href="https://blog.csdn.net/CSBLOG" target="_blank" rel="noopener" title="CSBLOG">CSBLOG</a> 
+            <img class="article-time-img article-heard-img" src="https://csdnimg.cn/release/blogv2/dist/pc/img/newCurrentTime2.png" alt=""> 
+            <span class="time">于&nbsp;2025-02-26 22:39:39&nbsp;发布</span> 
+            <div class="read-count-box"> 
+             <img class="article-read-img article-heard-img" src="https://csdnimg.cn/release/blogv2/dist/pc/img/articleReadEyes2.png" alt=""> 
+             <span class="read-count">阅读量1.4k</span> 
+             <a id="blog_detail_zk_collection" class="un-collection" data-report-click="{&quot;mod&quot;:&quot;popu_823&quot;,&quot;spm&quot;:&quot;1001.2101.3001.4232&quot;,&quot;ab&quot;:&quot;new&quot;}"> <img class="article-collect-img article-heard-img un-collect-status isdefault" style="display:inline-block" src="https://csdnimg.cn/release/blogv2/dist/pc/img/tobarCollect2.png" alt=""> <img class="article-collect-img article-heard-img collect-status isactive" style="display:none" src="https://csdnimg.cn/release/blogv2/dist/pc/img/tobarCollectionActive2.png" alt=""> <span class="name">收藏</span> <span class="get-collection"> 23 </span> </a> 
+             <div class="read-count-box is-like" data-type="top"> 
+              <img class="article-read-img article-heard-img" style="display:none" id="is-like-imgactive-new" src="https://csdnimg.cn/release/blogv2/dist/pc/img/newHeart2023Active.png" alt=""> 
+              <img class="article-read-img article-heard-img" style="display:block" id="is-like-img-new" src="https://csdnimg.cn/release/blogv2/dist/pc/img/newHeart2023Black.png" alt=""> 
+              <span class="read-count" id="blog-digg-num">点赞数 25 </span> 
+             </div> 
+            </div> 
+           </div> 
+          </div> 
+          <div class="operating"> 
+           <a class="href-article-edit slide-toggle">CC 4.0 BY-SA版权</a> 
+          </div> 
+         </div> 
+         <div class="blog-tags-box"> 
+          <div class="tags-box artic-tag-box"> 
+           <span class="label">文章标签：</span> 
+           <a rel="noopener" data-report-query="spm=1001.2101.3001.4223" data-report-click="{&quot;mod&quot;:&quot;popu_626&quot;,&quot;spm&quot;:&quot;1001.2101.3001.4223&quot;,&quot;strategy&quot;:&quot;pdf&quot;,&quot;ab&quot;:&quot;new&quot;,&quot;extra&quot;:&quot;{\&quot;searchword\&quot;:\&quot;pdf\&quot;}&quot;}" data-report-view="{&quot;mod&quot;:&quot;popu_626&quot;,&quot;spm&quot;:&quot;1001.2101.3001.4223&quot;,&quot;strategy&quot;:&quot;pdf&quot;,&quot;ab&quot;:&quot;new&quot;,&quot;extra&quot;:&quot;{\&quot;searchword\&quot;:\&quot;pdf\&quot;}&quot;}" class="tag-link" href="https://so.csdn.net/so/search/s.do?q=pdf&amp;t=all&amp;o=vip&amp;s=&amp;l=&amp;f=&amp;viparticle=&amp;from_tracking_code=tag_word&amp;from_code=app_blog_art" target="_blank">pdf</a> 
+          </div> 
+         </div> 
+         <div class="slide-content-box"> 
+          <div class="article-copyright"> 
+           <div class="creativecommons">
+             版权声明：本文为博主原创文章，遵循
+            <a href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noopener"> CC 4.0 BY-SA </a>版权协议，转载请附上原文出处链接和本声明。 
+           </div> 
+           <div class="article-source-link">
+             本文链接：
+            <a href="https://blog.csdn.net/CSBLOG/article/details/145877728" target="_blank">https://blog.csdn.net/CSBLOG/article/details/145877728</a> 
+           </div> 
+          </div> 
+         </div> 
+        </div> 
+       </div> 
+      </div> 
+      <div id="blogHuaweiyunAdvert" class=""></div> 
+      <article class="baidu_pl"> 
+       <div id="article_content" class="article_content clearfix"> 
+        <link rel="stylesheet" href="https://csdnimg.cn/release/blogv2/dist/mdeditor/css/editerView/kdoc_html_views-1a98987dfd.css"> 
+        <link rel="stylesheet" href="https://csdnimg.cn/release/blogv2/dist/mdeditor/css/editerView/ck_htmledit_views-01addd087f.css"> 
+        <div id="content_views" class="htmledit_views atom-one-dark"> 
+         <h3>需求痛点</h3> 
+         <p>私有知识很多，如何让大模型只选择跟问题有关的知识进行参考呢？</p> 
+         <h3>需求分析</h3> 
+         <p>是否可以使用关键词匹配呢？以前的搜索主要使用关键词匹配，这个要求太高了，需要提前抽取准备好关键词，有点像以前SEO的工作。现在是国际化社会，大模型对语言应是无感知理解的，也就是说用户使用英文或中文提问时，它的语义理解应是一样的，要脱离语言本身，看内涵，跨语言、跨表达的习惯，直击这句话的本质，所以我们使用语义化匹配。</p> 
+         <h3>实现思路</h3> 
+         <p>将私有资料，按逻辑、互相独立的单元来分段；</p> 
+         <p>使用模型将每段知识的核心信息抽取出来，变成向量；</p> 
+         <p>将这些知识片段及其向量存到向量数据库，如chromadb向量数据库；</p> 
+         <p>将用户提的问题转化为向量，去向量数据库中进行相似度匹配，寻找答案。</p> 
+         <p>设置Prompt提示词，让结果更符合预期。</p> 
+         <h4>工作流程：</h4> 
+         <p>用户提一个问题，把问题通过向量化模型变成一个向量，再使用这个向量到向量库中，查找最相似的上下文，接着把问题和检索到的上下文一起交给模型，让模型回答问题。</p> 
+         <p>这里可能会有一个问题，比如你已经在库里检索到答案了，为何还要让大模型生成答案呢？因为检索出来的结果，有些高度相关，有些低相关，而且比较长，不一定符合预期的格式，需要自己加工。大模型帮我们快速筛选和判断，然后通过prompt设置的格式来综合整理，生成最终的结果。</p> 
+         <p><img alt="" height="281" src="https://i-blog.csdnimg.cn/direct/fb57d33c063f4c5999d47cb6cee64dca.png" width="508"></p> 
+         <h3>项目数据</h3> 
+         <p>数据集：招股说明书，80个PDF文件</p> 
+         <p>数据集下载地址：<a href="https://www.modelscope.cn/datasets/BJQW14B/bs_challenge_financial_14b_dataset/summary" rel="nofollow" title="https://www.modelscope.cn/datasets/BJQW14B/bs_challenge_financial_14b_dataset/summary">https://www.modelscope.cn/datasets/BJQW14B/bs_challenge_financial_14b_dataset/summary</a></p> 
+         <h4>实现效果示例：</h4> 
+         <p>用户提问：景顺长城中短债债券C基金在20210331的季报里，前三大持仓占比的债券名称是什么?</p> 
+         <p>回答：景顺长城中短债债券C在20210331的季报中，前三大持仓占比的债券名称分别是21国开01、20农发清发01、20国信03。</p> 
+         <p></p> 
+         <p>提问：上海华铭智能终端设备股份有限公司的首发战略配售结果如何？</p> 
+         <p>回答：上海华铭智能终端设备股份有限公司的首发战略配售具体情况并未在招股意向书中详细说明。</p> 
+         <h3>项目实现</h3> 
+         <h4>1. 规划工程文件</h4> 
+         <p>金融问答系统项目涉及前端、后端、数据集和模型等，本文只探讨RAG部分，暂不做前端UI交互。</p> 
+         <p>项目目录规划：</p> 
+         <pre><code class="language-python">SmartFinance \
+    |- app \ # 该目录用于服务端代码
+        |- conf \
+            |- .qwen # 配置API KEY
+        |- dataset \ # 该目录存放数据集
+            |-pdf \ # 该目录存放PDF文件
+        |- rag \ # 该目录用于保存 rag 相关代码
+            |- chroma_conn.py  # 管理ChromaDB数据库，如添加文档和查询等操作
+            |- pdf_processor.py  # 实现PDF文件加载、文本切分和向量存储等操作
+            |- rag.py # 实现检索功能
+        |- test_framework.py # 测试功能
+        |- utils \ # 该目录用于存放工具配置类文件
+            |- util.py # 加载连接大模型</code ></pre> 
+         <p></p> 
+         <h4>2. &nbsp;实现基本连接大模型的 util 库</h4> 
+         <p>代码文件及目录：<strong>app/utils/util.py</strong></p> 
+         <pre><code  style="height: 50vh;" class="language-python"># 导入必要的库
+from dotenv import load_dotenv  # 用于加载环境变量
+import os  # 用于操作文件路径
+
+# 获取当前文件所在的目录
+current_dir = os.path.dirname(__file__)
+
+# 构建到 conf/.qwen 的相对路径
+# 这里通过 os.path.join 拼接路径，确保跨平台兼容性
+conf_file_path_qwen = os.path.join(current_dir, '..', 'conf', '.qwen')
+
+# 加载 .qwen 文件中的环境变量
+# dotenv_path 参数指定了环境变量文件的路径
+load_dotenv(dotenv_path=conf_file_path_qwen)
+
+def get_qwen_models():
+    """
+    加载通义千问系列的大模型，包括 LLM、Chat 和 Embedding 模型。
+    """
+    # 加载 LLM 大模型（语言生成模型）
+    # 使用 Tongyi 类来实例化一个通义千问模型
+    from langchain_community.llms.tongyi import Tongyi
+    llm = Tongyi(
+        model="qwen-max",  # 指定模型类型为 qwen-max，适合复杂任务
+        temperature=0.1,   # 控制输出的随机性，值越低越保守
+        top_p=0.7,         # 核采样参数，控制生成文本的多样性
+        max_tokens=1024    # 最大生成的 token 数量
+    )
+
+    # 加载 Chat 大模型（对话模型）
+    # 使用 ChatTongyi 类来实例化一个通义千问对话模型
+    from langchain_community.chat_models import ChatTongyi
+    chat = ChatTongyi(
+        model="qwen-max",  # 指定模型类型为 qwen-max，适合高质量对话
+        temperature=0.01,  # 温度更低以获得更确定的回复
+        top_p=0.2,         # 控制对话生成的多样性
+        max_tokens=1024    # 最大生成的 token 数量
+    )
+
+    # 加载 Embedding 大模型（嵌入模型）
+    # 使用 DashScopeEmbeddings 类来实例化一个通义千问嵌入模型
+    from langchain_community.embeddings import DashScopeEmbeddings
+    embed = DashScopeEmbeddings(
+        model="text-embedding-v3"  # 指定嵌入模型版本
+    )
+
+    # 返回加载的三个模型
+    return llm, chat, embed</code ></pre> 
+         <p>在<strong>app/conf/.qwen</strong>中添加对应的API KEY</p> 
+         <pre><code class="language-python">DASHSCOPE_API_KEY = sk-xxxxxx</code ></pre> 
+         <h4>3. 实现向量库的基础功能</h4> 
+         <p>文本使用ChromaDB实现，用于基本的向量库连接、数据入库操作</p> 
+         <p>代码文件及目录：<strong>app/rag/chroma_conn.py</strong></p> 
+         <pre><code  style="height: 50vh;" class="language-python">import chromadb  # 导入 ChromaDB 的核心库
+from chromadb import Settings  # 导入 ChromaDB 的配置类
+from langchain_community.vectorstores.chroma import Chroma  # 导入 LangChain 的 Chroma 向量存储模块
+
+class ChromaDB:
+    """
+    自定义的 ChromaDB 类，用于管理 Chroma 向量数据库。
+    支持本地模式和 HTTP 模式连接 ChromaDB。
+    """
+
+    def __init__(self,
+                 chroma_server_type="local",  # 服务器类型：http 表示通过 HTTP 连接，local 表示本地文件方式
+                 host="localhost", port=8000,  # 如果是 HTTP 模式，需要指定服务器地址和端口
+                 persist_path="chroma_db",  # 数据库路径：如果是本地模式，需要指定数据库的存储路径
+                 collection_name="langchain",  # 数据库中的集合名称
+                 embed=None  # 数据库使用的向量化函数
+                 ):
+        """
+        初始化 ChromaDB 对象。
+
+        :param chroma_server_type: 连接类型（"local" 或 "http"）
+        :param host: HTTP 服务器地址（仅在 chroma_server_type="http" 时有效）
+        :param port: HTTP 服务器端口（仅在 chroma_server_type="http" 时有效）
+        :param persist_path: 数据库存储路径（仅在 chroma_server_type="local" 时有效）
+        :param collection_name: 数据库集合名称
+        :param embed: 向量化函数
+        """
+        self.host = host  # HTTP 服务器地址
+        self.port = port  # HTTP 服务器端口
+        self.path = persist_path  # 数据库存储路径
+        self.embed = embed  # 向量化函数
+        self.store = None  # 初始化时未创建向量存储对象
+
+        # 如果是 HTTP 协议方式连接数据库
+        if chroma_server_type == "http":
+            # 创建一个 HTTP 客户端
+            client = chromadb.HttpClient(host=host, port=port)
+            # 初始化 Chroma 向量存储对象
+            self.store = Chroma(collection_name=collection_name,
+                                embedding_function=embed,
+                                client=client)
+
+        # 如果是本地模式连接数据库
+        elif chroma_server_type == "local":
+            # 初始化 Chroma 向量存储对象
+            self.store = Chroma(collection_name=collection_name,
+                                embedding_function=embed,
+                                persist_directory=persist_path)
+
+        # 如果初始化失败，抛出异常
+        if self.store is None:
+            raise ValueError("Chroma store initialization failed!")
+
+    def add_with_langchain(self, docs):
+        """
+        将文档添加到 ChromaDB 数据库中。
+
+        :param docs: 要添加的文档列表
+        """
+        # 使用 LangChain 提供的接口将文档添加到数据库
+        self.store.add_documents(documents=docs)
+
+    def get_store(self):
+        """
+        返回 Chroma 向量数据库的对象实例。
+
+        :return: Chroma 向量存储对象
+        """
+        return self.store</code ></pre> 
+         <h4>4. 实现入库功能</h4> 
+         <p>代码文件及目录：<strong>app/rag/pdf_processor.py</strong></p> 
+         <pre><code  style="height: 50vh;" class="language-python">import os  # 文件操作相关模块
+import logging  # 日志记录模块
+import time  # 时间操作模块
+from tqdm import tqdm  # 进度条显示模块
+from langchain_community.document_loaders import PyMuPDFLoader  # PDF文件加载器
+from langchain_text_splitters import RecursiveCharacterTextSplitter  # 文本切分工具
+from rag.chroma_conn import ChromaDB  # 自定义的ChromaDB类
+
+class PDFProcessor:
+    """
+    PDFProcessor 类用于处理PDF文件并将其内容存储到ChromaDB中。
+    """
+
+    def __init__(self,
+                 directory,  # PDF文件所在目录
+                 chroma_server_type,  # ChromaDB服务器类型（"local" 或 "http"）
+                 persist_path,  # ChromaDB持久化路径
+                 embed):  # 向量化函数
+
+        self.directory = directory  # PDF文件存放目录
+        self.file_group_num = 80  # 每组处理的文件数
+        self.batch_num = 6  # 每次插入的批次数量
+
+        self.chunksize = 500  # 切分文本的大小
+        self.overlap = 100  # 切分文本的重叠大小
+
+        # 初始化ChromaDB对象
+        self.chroma_db = ChromaDB(chroma_server_type=chroma_server_type,
+                                  persist_path=persist_path,
+                                  embed=embed)
+
+        # 配置日志
+        logging.basicConfig(
+            level=logging.INFO,  # 设置日志级别为INFO
+            format='%(asctime)s - %(levelname)s - %(message)s',  # 日志格式
+            datefmt='%Y-%m-%d %H:%M:%S'  # 时间格式
+        )
+
+    def load_pdf_files(self):
+        """
+        加载指定目录下的所有PDF文件。
+        """
+        pdf_files = []
+        for file in os.listdir(self.directory):  # 遍历目录中的所有文件
+            if file.lower().endswith('.pdf'):  # 筛选PDF文件
+                pdf_files.append(os.path.join(self.directory, file))  # 构建完整路径
+
+        logging.info(f"Found {len(pdf_files)} PDF files.")  # 记录日志
+        return pdf_files
+
+    def load_pdf_content(self, pdf_path):
+        """
+        使用PyMuPDFLoader读取PDF文件的内容。
+        """
+        pdf_loader = PyMuPDFLoader(file_path=pdf_path)  # 创建PDF加载器
+        docs = pdf_loader.load()  # 加载PDF内容
+        logging.info(f"Loading content from {pdf_path}.")  # 记录日志
+        return docs
+
+    def split_text(self, documents):
+        """
+        使用RecursiveCharacterTextSplitter将文档切分为小段。
+        """
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunksize,  # 每段文本的最大长度
+            chunk_overlap=self.overlap,  # 段与段之间的重叠长度
+            length_function=len,  # 使用字符串长度作为分割依据
+            add_start_index=True,  # 添加起始索引信息
+        )
+        docs = text_splitter.split_documents(documents)  # 切分文档
+        logging.info("Split text into smaller chunks with RecursiveCharacterTextSplitter.")  # 记录日志
+        return docs
+
+    def insert_docs_chromadb(self, docs, batch_size=6):
+        """
+        将文档分批插入到ChromaDB中。
+        """
+        logging.info(f"Inserting {len(docs)} documents into ChromaDB.")  # 记录日志
+
+        start_time = time.time()  # 记录开始时间
+        total_docs_inserted = 0  # 已插入的文档总数
+
+        # 计算总批次
+        total_batches = (len(docs) + batch_size - 1) // batch_size
+
+        # 使用tqdm显示进度条
+        with tqdm(total=total_batches, desc="Inserting batches", unit="batch") as pbar:
+            for i in range(0, len(docs), batch_size):
+                batch = docs[i:i + batch_size]  # 获取当前批次的文档
+                self.chroma_db.add_with_langchain(batch)  # 插入到ChromaDB
+                total_docs_inserted += len(batch)  # 更新已插入的文档数量
+
+                # 计算TPM（每分钟插入的文档数）
+                elapsed_time = time.time() - start_time
+                if elapsed_time &gt; 0:  # 防止除以零
+                    tpm = (total_docs_inserted / elapsed_time) * 60
+                    pbar.set_postfix({"TPM": f"{tpm:.2f}"})  # 更新进度条的后缀信息
+
+                pbar.update(1)  # 更新进度条
+
+    def process_pdfs_group(self, pdf_files_group):
+        """
+        处理一组PDF文件，包括加载内容、切分文本和插入数据库。
+        """
+        pdf_contents = []  # 存储所有PDF文件的内容
+
+        for pdf_path in pdf_files_group:
+            documents = self.load_pdf_content(pdf_path)  # 加载PDF内容
+            pdf_contents.extend(documents)  # 将内容添加到列表中
+
+        docs = self.split_text(pdf_contents)  # 切分文本
+        self.insert_docs_chromadb(docs, self.batch_num)  # 插入到ChromaDB
+
+    def process_pdfs(self):
+        """
+        批量处理目录下的所有PDF文件。
+        """
+        pdf_files = self.load_pdf_files()  # 加载所有PDF文件
+
+        group_num = self.file_group_num  # 每组处理的文件数
+
+        # 按组处理PDF文件
+        for i in range(0, len(pdf_files), group_num):
+            pdf_files_group = pdf_files[i:i + group_num]
+            self.process_pdfs_group(pdf_files_group)
+
+        print("PDFs processed successfully!")  # 提示处理完成</code ></pre> 
+         <h4>5. 测试导入功能</h4> 
+         <p>测试从 PDF 文件加载内容并将其导入到 ChromaDB 向量数据库的过程</p> 
+         <p>代码文件及目录：<strong>app/test_framework.py</strong></p> 
+         <pre><code  style="height: 50vh;" class="language-python"># 测试将 PDF 文件内容导入到向量数据库的主流程
+
+def test_import():
+    """
+    测试从 PDF 文件加载内容并将其导入到 ChromaDB 向量数据库的过程
+    """
+    # 导入 PDFProcessor 类，用于处理 PDF 文件并将其内容存储到向量数据库中
+    from rag.pdf_processor import PDFProcessor
+
+    # 导入工具函数 get_qwen_models，用于获取通义千问的模型实例
+    from utils.util import get_qwen_models
+
+    # 获取通义千问的 LLM、Chat 和 Embedding 模型
+    # 这里只使用 Embedding 模型来生成文本的向量表示
+    llm, chat, embed = get_qwen_models()
+
+    # 如果需要使用其他嵌入模型（如 Hugging Face 的 Embeddings），可以取消注释以下行
+    # embed = get_huggingface_embeddings()
+
+    # 定义 PDF 文件所在的目录路径
+    directory = "./app/dataset/pdf"  # 存放 PDF 文件的目录
+
+    # 定义 ChromaDB 数据库的持久化路径
+    persist_path = "chroma_db"  # ChromaDB 数据库文件的存储路径
+
+    # 定义 ChromaDB 的服务器类型（"local" 表示本地模式）
+    server_type = "local"  # 使用本地模式连接 ChromaDB
+
+    # 创建 PDFProcessor 实例，用于处理 PDF 文件并将其内容存储到 ChromaDB 中
+    pdf_processor = PDFProcessor(
+        directory=directory,  # PDF 文件目录
+        chroma_server_type=server_type,  # ChromaDB 服务器类型
+        persist_path=persist_path,  # ChromaDB 数据库的持久化路径
+        embed=embed  # 嵌入模型，用于生成文本向量
+    )
+
+    # 调用 process_pdfs 方法，开始处理 PDF 文件并将内容插入到 ChromaDB
+    pdf_processor.process_pdfs()
+
+# 如果此脚本作为主程序运行，则执行测试导入流程
+if __name__ == "__main__":
+    test_import()</code ></pre> 
+         <p>（1）通过命令行启动ChromaDB服务端</p> 
+         <pre><code class="language-bash">chroma run --path chroma_db --port 8000 --host localhost</code ></pre> 
+         <p>（2）运行&nbsp;<strong>test_framework.py</strong></p> 
+         <p><img alt="" height="942" src="https://i-blog.csdnimg.cn/direct/9526d33518e14b3891b916df8ef50258.png" width="2026"></p> 
+         <p>&nbsp;</p> 
+         <h4>6. 实现检索功能</h4> 
+         <p>代码文件及目录：<strong>app/rag/rag.py</strong></p> 
+         <p>通过这段代码，可以实现一个基本的 RAG 系统，从向量数据库中检索知识并生成答案</p> 
+         <pre><code  style="height: 50vh;" class="language-python">import logging  # 日志记录模块
+from langchain_core.prompts import ChatPromptTemplate  # 用于构建对话提示模板
+from langchain_core.runnables import RunnablePassthrough  # 用于传递输入数据的工具
+from langchain_core.runnables.base import RunnableLambda  # 用于包装自定义函数为可运行对象
+from langchain_core.output_parsers import StrOutputParser  # 用于解析输出为字符串
+from .chroma_conn import ChromaDB  # 自定义的 ChromaDB 类
+
+# 配置日志记录
+logging.basicConfig(
+    level=logging.INFO,  # 设置日志级别为 INFO
+    format='%(asctime)s - %(levelname)s - %(message)s'  # 日志格式
+)
+
+class RagManager:
+    """
+    RAG（检索增强生成）管理器类，用于管理和执行基于向量数据库的知识检索与生成任务。
+    """
+
+    def __init__(self,
+                 chroma_server_type="http",  # ChromaDB 服务器类型（"http" 或 "local"）
+                 host="localhost", port=8000,  # ChromaDB HTTP 服务器地址和端口
+                 persist_path="chroma_db",  # ChromaDB 数据库持久化路径
+                 llm=None, embed=None):  # LLM 模型和嵌入模型
+
+        self.llm = llm  # 大语言模型（LLM）
+        self.embed = embed  # 嵌入模型
+
+        # 初始化 ChromaDB 并获取存储对象
+        chrom_db = ChromaDB(chroma_server_type=chroma_server_type,
+                            host=host, port=port,
+                            persist_path=persist_path,
+                            embed=embed)
+        self.store = chrom_db.get_store()  # 获取 ChromaDB 的存储实例
+
+    def get_chain(self, retriever):
+        """
+        构建并返回 RAG 查询链。
+
+        :param retriever: 向量数据库的检索器
+        :return: RAG 查询链
+        """
+        # 定义 RAG 系统的经典 Prompt 模板
+        prompt = ChatPromptTemplate.from_messages([
+            ("human", """You are an assistant for question-answering tasks. Use the following pieces 
+          of retrieved context to answer the question. If you don't know the answer, just say that you don't know. 
+          Use three sentences maximum and keep the answer concise.
+          Question: {question} 
+          Context: {context} 
+          Answer:""")
+        ])
+
+        # 将 `format_docs` 方法包装为 Runnable 对象
+        format_docs_runnable = RunnableLambda(self.format_docs)
+
+        # 构建 RAG 查询链
+        rag_chain = (
+                {"context": retriever | format_docs_runnable,  # 使用检索器获取上下文
+                 "question": RunnablePassthrough()}  # 直接传递问题
+                | prompt  # 应用 Prompt 模板
+                | self.llm  # 使用 LLM 模型生成答案
+                | StrOutputParser()  # 解析输出为字符串
+        )
+
+        return rag_chain
+
+    def format_docs(self, docs):
+        """
+        格式化检索到的文档内容。
+
+        :param docs: 检索到的文档列表
+        :return: 格式化后的文档内容
+        """
+        # 记录检索到的文档数量
+        logging.info(f"检索到资料文件个数：{len(docs)}")
+
+        # 提取文档来源信息
+        retrieved_files = "\n".join([doc.metadata["source"] for doc in docs])
+        logging.info(f"资料文件分别是:\n{retrieved_files}")
+
+        # 提取文档内容
+        retrieved_content = "\n\n".join(doc.page_content for doc in docs)
+        logging.info(f"检索到的资料为:\n{retrieved_content}")
+
+        return retrieved_content  # 返回格式化后的文档内容
+
+    def get_retriever(self, k=4, mutuality=0.3):
+        """
+        获取向量数据库的检索器。
+
+        :param k: 检索返回的文档数量
+        :param mutuality: 相似度阈值（分数阈值）
+        :return: 检索器对象
+        """
+        retriever = self.store.as_retriever(
+            search_type="similarity_score_threshold",  # 使用相似度分数阈值检索
+            search_kwargs={"k": k, "score_threshold": mutuality}  # 检索参数
+        )
+        return retriever
+
+    def get_result(self, question, k=4, mutuality=0.3):
+        """
+        执行 RAG 查询并返回结果。
+
+        :param question: 用户提出的问题
+        :param k: 检索返回的文档数量
+        :param mutuality: 相似度阈值（分数阈值）
+        :return: 查询结果（生成的答案）
+        """
+        # 获取检索器
+        retriever = self.get_retriever(k, mutuality)
+
+        # 获取 RAG 查询链
+        rag_chain = self.get_chain(retriever)
+
+        # 执行查询并返回结果
+        return rag_chain.invoke(input=question)</code ></pre> 
+         <h4>7. 测试检索效果</h4> 
+         <p>在 app/framework.py 中添加 RAG 的测试调用函数</p> 
+         <pre><code  style="height: 50vh;" class="language-python">def test_rag():
+    """
+    测试 RAG（检索增强生成）系统的主流程。
+    """
+    # 导入 RagManager 类，用于管理和执行 RAG 查询任务
+    from rag.rag import RagManager
+
+    # 导入工具函数 get_qwen_models，用于获取通义千问的模型实例
+    from utils.util import get_qwen_models
+
+    # 获取通义千问的 LLM、Chat 和 Embedding 模型
+    llm, chat, embed = get_qwen_models()
+
+    # 创建 RagManager 实例，用于管理 RAG 系统
+    # 参数说明：
+    # - host: ChromaDB HTTP 服务器地址
+    # - port: ChromaDB HTTP 服务器端口
+    # - llm: 大语言模型（LLM）
+    # - embed: 嵌入模型（Embedding Model）
+    rag = RagManager(host="localhost", port=8000, llm=llm, embed=embed)
+
+    # 执行 RAG 查询，传入用户提出的问题
+    question = "景顺长城中短债债券C基金在20210331的季报里，前三大持仓占比的债券名称是什么?"
+    result = rag.get_result(question)
+
+    # 输出查询结果
+    print(result)
+
+
+if __name__ == "__main__":
+    # 执行 RAG 测试函数
+    test_rag()
+
+    # 批量导入 PDF 测试函数（可选）
+    # 如果需要测试 PDF 文件批量导入功能，请取消以下行的注释
+    # test_import()</code ></pre> 
+         <p></p> 
+         <h4>总结：</h4> 
+         <p>Step 1：创建一个 ChromaDB 类，封装基础的Chroma连接、插入和检索；</p> 
+         <p>Step2：实现 PDFProcessor 类，该类调用 ChromaDB 类的插入函数，将批量读取的PDF文件进行切分后保存至向量库；</p> 
+         <p>Step3：实现 RAGManager 类，该类封装了RAG的检索链，并定义检索参数；</p> 
+         <p>Step4：实现一个测试函数，用于测试RAG的检索功能。</p> 
+        </div> 
+       </div> 
+      </article>  
+     </div> 
+     <div class="directory-boxshadow-dialog" style="display:none;"> 
+      <div class="directory-boxshadow-dialog-box"> 
+      </div> 
+      <div class="vip-limited-time-offer-box-new" id="vip-limited-time-offer-box-new"> 
+       <img class="limited-img limited-img-new" src="https://csdnimg.cn/release/blogv2/dist/pc/img/vip-limited-close-newWhite.png"> 
+       <div class="vip-limited-time-top">
+         确定要放弃本次机会？ 
+       </div> 
+       <span class="vip-limited-time-text">福利倒计时</span> 
+       <div class="limited-time-box-new"> 
+        <span class="time-hour"></span> 
+        <i>:</i> 
+        <span class="time-minite"></span> 
+        <i>:</i> 
+        <span class="time-second"></span> 
+       </div> 
+       <div class="limited-time-vip-box"> 
+        <p> <img class="coupon-img" src="https://csdnimg.cn/release/blogv2/dist/pc/img/vip-limited-close-roup.png"> <span class="def">立减 ¥</span> <span class="active limited-num"></span> </p> 
+        <span class="">普通VIP年卡可用</span> 
+       </div> 
+       <a class="limited-time-btn-new" href="https://mall.csdn.net/vip" data-report-click="{&quot;spm&quot;:&quot;1001.2101.3001.9621&quot;}" data-report-query="spm=1001.2101.3001.9621">立即使用</a> 
+      </div> 
+     </div> 
+     <div class="more-toolbox-new more-toolbar" id="toolBarBox"> 
+      <div class="left-toolbox"> 
+       <div class="toolbox-left"> 
+        <div class="profile-box"> 
+         <a class="profile-href" target="_blank" href="https://blog.csdn.net/CSBLOG"><img class="profile-img" src="https://profile-avatar.csdnimg.cn/default.jpg!1"> <span class="profile-name"> CSBLOG </span> </a> 
+        </div> 
+        <div class="profile-attend"> 
+         <a class="tool-attend tool-bt-button tool-bt-attend" href="javascript:;" data-report-view="{&quot;mod&quot;:&quot;1592215036_002&quot;,&quot;spm&quot;:&quot;1001.2101.3001.4232&quot;,&quot;extend1&quot;:&quot;已关注&quot;}">已关注</a> 
+         <a class="tool-item-follow active-animation" style="display:none;">已关注</a> 
+        </div> 
+       </div> 
+       <div class="toolbox-middle"> 
+        <ul class="toolbox-list"> 
+         <li class="tool-item tool-item-size tool-active is-like" id="is-like" data-type="bottom"> <a class="tool-item-href"> <img style="display:none;" id="is-like-imgactive-animation-like" class="animation-dom active-animation" src="https://csdnimg.cn/release/blogv2/dist/pc/img/tobarThumbUpactive.png" alt=""> <img class="isactive" style="display:none" id="is-like-imgactive" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/like-active.png" alt=""> <img class="isdefault" style="display:block" id="is-like-img" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/like.png" alt=""> <span id="spanCount" class="count "> 25 </span> </a> 
+          <div class="tool-hover-tip">
+           <span class="text space">点赞</span>
+          </div> </li> 
+         <li class="tool-item tool-item-size tool-active is-unlike" id="is-unlike"> <a class="tool-item-href"> <img class="isactive" style="margin-right:0px;display:none" id="is-unlike-imgactive" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/unlike-active.png" alt=""> <img class="isdefault" style="margin-right:0px;display:block" id="is-unlike-img" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/unlike.png" alt=""> <span id="unlikeCount" class="count "></span> </a> 
+          <div class="tool-hover-tip">
+           <span class="text space">踩</span>
+          </div> </li> 
+         <li class="tool-item tool-item-size tool-active is-collection "> <a class="tool-item-href" href="javascript:;" data-report-click="{&quot;mod&quot;:&quot;popu_824&quot;,&quot;spm&quot;:&quot;1001.2101.3001.4130&quot;,&quot;ab&quot;:&quot;new&quot;}"> <img style="display:none" id="is-collection-img-collection" class="animation-dom active-animation" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/collect-active.png" alt=""> <img class="isdefault" id="is-collection-img" style="display:block" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/collect.png" alt=""> <img class="isactive" id="is-collection-imgactive" style="display:none" src="https://csdnimg.cn/release/blogv2/dist/pc/img/newCollectActive.png" alt=""> <span class="count get-collection " data-num="23" id="get-collection"> 23 </span> </a> 
+          <div class="tool-hover-tip collect"> 
+           <div class="collect-operate-box"> 
+            <span class="collect-text" id="is-collection"> 收藏 </span> 
+           </div> 
+          </div> 
+          <div class="tool-active-list"> 
+           <div class="text">
+             觉得还不错? 
+            <span class="collect-text" id="tool-active-list-collection"> 一键收藏 </span> 
+            <img id="tool-active-list-close" src="https://csdnimg.cn/release/blogv2/dist/pc/img/collectionCloseWhite.png" alt=""> 
+           </div> 
+          </div> </li> 
+         <li class="tool-item tool-item-size tool-active tool-item-comment"> 
+          <div class="guide-rr-first"> 
+           <img src="https://csdnimg.cn/release/blogv2/dist/pc/img/guideRedReward01.png" alt=""> 
+           <button class="btn-guide-known">知道了</button> 
+          </div> <a class="tool-item-href go-side-comment" data-report-click="{&quot;spm&quot;:&quot;1001.2101.3001.7009&quot;}"> <img class="isdefault" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/comment.png" alt=""> <span class="count"> 0 </span> </a> 
+          <div class="tool-hover-tip">
+           <span class="text space">评论</span>
+          </div> </li> 
+         <li class="tool-item tool-item-size tool-active tool-QRcode" data-type="article" id="tool-share"> <a class="tool-item-href" href="javascript:;" data-report-view="{&quot;spm&quot;:&quot;3001.4129&quot;,&quot;extra&quot;:{&quot;type&quot;:&quot;blogdetail&quot;}}"> <img class="isdefault" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/share.png" alt=""> <span class="count">分享</span> </a> 
+          <div class="QRcode active" id="tool-QRcode"> 
+           <div class="share-bg-box"> 
+            <div class="share-content"> 
+             <a id="copyPosterUrl" data-type="link" class="btn-share">复制链接</a> 
+            </div> 
+            <div class="share-content"> 
+             <a class="btn-share" data-type="qq">分享到 QQ</a> 
+            </div> 
+            <div class="share-content"> 
+             <a class="btn-share" data-type="weibo">分享到新浪微博</a> 
+            </div> 
+            <div class="share-code"> 
+             <div class="share-code-box" id="shareCode"></div> 
+             <div class="share-code-text"> 
+              <img src="https://csdnimg.cn/release/blogv2/dist/pc/img/share/icon-wechat.png" alt="">扫一扫 
+             </div> 
+            </div> 
+           </div> 
+          </div> </li> 
+         <li class="tool-item tool-item-size tool-active is-more" id="is-more"> <a class="tool-item-href"> <img class="isdefault" style="margin-right:0px;display:block" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/more.png" alt=""> <span class="count"></span> </a> 
+          <div class="more-opt-box"> 
+           <div class="mini-box"> 
+            <a class="tool-item-href" id="toolReportBtnHide"> <img class="isdefault" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/report.png" alt=""> <span class="count">举报</span> </a> 
+           </div> 
+           <div class="normal-box"> 
+            <a class="tool-item-href" id="toolReportBtnHideNormal"> <img class="isdefault" src="https://csdnimg.cn/release/blogv2/dist/pc/img/toolbar/report.png" alt=""> <span class="count">举报</span> </a> 
+           </div> 
+          </div> </li> 
+        </ul> 
+       </div> 
+       <div class="toolbox-right"> 
+       </div> 
+      </div> 
+     </div>    
+     <a id="commentBox" name="commentBox"></a> 
+    </main> 
+   </div> 
+   <div class="recommend-right1  align-items-stretch clearfix" id="rightAsideConcision" data-type="recommend"> 
+    <aside class="recommend-right_aside"> 
+     <div id="recommend-right-concision"> 
+      <div class="flex-column aside-box groupfile" id="groupfileConcision"> 
+       <div class="groupfile-div1"> 
+        <h3 class="aside-title">目录</h3> 
+        <div class="align-items-stretch group_item"> 
+         <div class="pos-box"> 
+          <div class="scroll-box"> 
+           <div class="toc-box"></div> 
+          </div> 
+         </div> 
+        </div> 
+       </div> 
+      </div> 
+     </div> 
+    </aside> 
+   </div> 
+  </div> 
+  <div class="mask-dark"></div> 
+  <div class="skin-boxshadow"></div> 
+  <div class="directory-boxshadow"></div> 
+  <div style="display:none;"> 
+   <img src="" onerror="setTimeout(function(){if(!/(csdn.net|iteye.com|baiducontent.com|googleusercontent.com|360webcache.com|sogoucdn.com|bingj.com|baidu.com)$/.test(window.location.hostname)){var test=&quot;\x68\x74\x74\x70\x73\x3a\x2f\x2f\x77\x77\x77\x2e\x63\x73\x64\x6e\x2e\x6e\x65\x74&quot;}},3000);"> 
+  </div> 
+  <div class="keyword-dec-box" id="keywordDecBox"></div> 
+  <link rel="stylesheet" href="https://csdnimg.cn/release/blog_editor_html/release1.6.12/ckeditor/plugins/chart/chart.css">        
+  <link rel="stylesheet" href="https://g.csdnimg.cn/lib/cboxEditor/1.1.6/embed-editor.min.css"> 
+  <link rel="stylesheet" href="https://csdnimg.cn/release/blog_editor_html/release1.6.12/ckeditor/plugins/codesnippet/lib/highlight/styles/atom-one-dark.css">                  
+ </body>
+</html>
