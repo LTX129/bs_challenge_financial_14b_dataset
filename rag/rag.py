@@ -1,116 +1,210 @@
-import logging  # 日志记录模块
-from langchain_core.prompts import ChatPromptTemplate  # 用于构建对话提示模板
-from langchain_core.runnables import RunnablePassthrough  # 用于传递输入数据的工具
-from langchain_core.runnables.base import RunnableLambda  # 用于包装自定义函数为可运行对象
-from langchain_core.output_parsers import StrOutputParser  # 用于解析输出为字符串
-from .chroma_conn import ChromaDB  # 自定义的 ChromaDB 类
+import logging
 
-# 配置日志记录
+from typing import Any, Dict, List, Optional
+
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables.base import RunnableLambda
+
+from .chroma_conn import ChromaDB
+
 logging.basicConfig(
-    level=logging.INFO,  # 设置日志级别为 INFO
-    format='%(asctime)s - %(levelname)s - %(message)s'  # 日志格式
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
 
 class RagManager:
     """
-    RAG（检索增强生成）管理器类，用于管理和执行基于向量数据库的知识检索与生成任务。
+    Build the full RAG chain backed by ChromaDB and expose helper APIs for answers
+    (optionally with source snippets).
     """
 
-    def __init__(self,
-                 chroma_server_type="http",  # ChromaDB 服务器类型（"http" 或 "local"）
-                 host="localhost", port=8000,  # ChromaDB HTTP 服务器地址和端口
-                 persist_path="chroma_db",  # ChromaDB 数据库持久化路径
-                 llm=None, embed=None):  # LLM 模型和嵌入模型
+    def __init__(
+        self,
+        chroma_server_type: str = "local",
+        host: str = "localhost",
+        port: int = 8000,
+        persist_path: str = "chroma_db",
+        collection_name: str = "langchain",
+        llm=None,
+        embed=None,
+    ):
+        self.llm = llm
+        self.embed = embed
 
-        self.llm = llm  # 大语言模型（LLM）
-        self.embed = embed  # 嵌入模型
+        chrom_db = ChromaDB(
+            chroma_server_type=chroma_server_type,
+            host=host,
+            port=port,
+            persist_path=persist_path,
+            collection_name=collection_name,
+            embed=embed,
+        )
+        self.store = chrom_db.get_store()
 
-        # 初始化 ChromaDB 并获取存储对象
-        chrom_db = ChromaDB(chroma_server_type=chroma_server_type,
-                            host=host, port=port,
-                            persist_path=persist_path,
-                            embed=embed)
-        self.store = chrom_db.get_store()  # 获取 ChromaDB 的存储实例
-
-    def get_chain(self, retriever):
-        """
-        构建并返回 RAG 查询链。
-
-        :param retriever: 向量数据库的检索器
-        :return: RAG 查询链
-        """
-        # 定义 RAG 系统的经典 Prompt 模板
-        prompt = ChatPromptTemplate.from_messages([
-            ("human", """You are an assistant for question-answering tasks. Use the following pieces 
-          of retrieved context to answer the question. If you don't know the answer, just say that you don't know. 
-          Use three sentences maximum and keep the answer concise.
-          Question: {question} 
-          Context: {context} 
-          Answer:""")
-        ])
-
-        # 将 `format_docs` 方法包装为 Runnable 对象
-        format_docs_runnable = RunnableLambda(self.format_docs)
-
-        # 构建 RAG 查询链
-        rag_chain = (
-                {"context": retriever | format_docs_runnable,  # 使用检索器获取上下文
-                 "question": RunnablePassthrough()}  # 直接传递问题
-                | prompt  # 应用 Prompt 模板
-                | self.llm  # 使用 LLM 模型生成答案
-                | StrOutputParser()  # 解析输出为字符串
+        self.prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "human",
+                    """You are an assistant for question-answering tasks. Use the following pieces
+of retrieved context to answer the question. If you don't know the answer, just say that you don't know.
+Use three sentences maximum and keep the answer concise.
+Question: {question}
+Context: {context}
+Answer:""",
+                )
+            ]
         )
 
+    def get_chain(self, retriever):
+        format_docs_runnable = RunnableLambda(self.format_docs)
+
+        rag_chain = (
+            {
+                "context": retriever | format_docs_runnable,
+                "question": RunnablePassthrough(),
+            }
+            | self.prompt
+            | self.llm
+            | StrOutputParser()
+        )
         return rag_chain
 
     def format_docs(self, docs):
-        """
-        格式化检索到的文档内容。
+        logging.info("Retrieved %s documents.", len(docs))
 
-        :param docs: 检索到的文档列表
-        :return: 格式化后的文档内容
-        """
-        # 记录检索到的文档数量
-        logging.info(f"检索到资料文件个数：{len(docs)}")
+        retrieved_files = "\n".join([doc.metadata.get("source", "unknown") for doc in docs])
+        logging.info("Sources:\n%s", retrieved_files)
 
-        # 提取文档来源信息
-        retrieved_files = "\n".join([doc.metadata["source"] for doc in docs])
-        logging.info(f"资料文件分别是:\n{retrieved_files}")
-
-        # 提取文档内容
         retrieved_content = "\n\n".join(doc.page_content for doc in docs)
-        logging.info(f"检索到的资料为:\n{retrieved_content}")
+        logging.debug("Retrieved content preview:\n%s", retrieved_content[:2000])
 
-        return retrieved_content  # 返回格式化后的文档内容
+        return retrieved_content
 
-    def get_retriever(self, k=4, mutuality=0.3):
+    def get_retriever(self, k=4, mutuality=0.3, search_kwargs: dict | None = None):
         """
-        获取向量数据库的检索器。
-
-        :param k: 检索返回的文档数量
-        :param mutuality: 相似度阈值（分数阈值）
-        :return: 检索器对象
+        Build a retriever; when mutuality<=0 fall back to plain similarity (no threshold).
         """
-        retriever = self.store.as_retriever(
-            search_type="similarity_score_threshold",  # 使用相似度分数阈值检索
-            search_kwargs={"k": k, "score_threshold": mutuality}  # 检索参数
+        _search_kwargs = search_kwargs or {}
+        _search_kwargs["k"] = k
+
+        if mutuality and mutuality > 0:
+            _search_kwargs["score_threshold"] = mutuality
+            return self.store.as_retriever(
+                search_type="similarity_score_threshold",
+                search_kwargs=_search_kwargs,
+            )
+        return self.store.as_retriever(
+            search_type="similarity",
+            search_kwargs=_search_kwargs,
         )
-        return retriever
+
+    def _fetch_docs(self, retriever, question):
+        """
+        Try multiple retriever interfaces for cross-version compatibility.
+        """
+        docs = None
+        last_error: Exception | None = None
+
+        try:
+            docs = retriever.get_relevant_documents(question)
+        except Exception as exc:
+            last_error = exc
+
+        if docs is None:
+            try:
+                docs = retriever.invoke(question)  # LCEL-compatible
+            except Exception as exc:
+                last_error = exc
+
+        if docs is None:
+            try:
+                docs = retriever._get_relevant_documents(
+                    question, run_manager=None
+                )
+            except Exception as exc:
+                last_error = exc
+
+        if docs is None:
+            raise RuntimeError(
+                "Retriever failed. If you see an embedding dimension mismatch, ensure the query "
+                "embedding model matches the collection that was indexed."
+            ) from last_error
+
+        return docs
 
     def get_result(self, question, k=4, mutuality=0.3):
+        result = self.get_result_with_sources(question, k, mutuality)
+        return result["answer"]
+
+    def get_result_with_sources(
+        self,
+        question: str,
+        k: int = 4,
+        mutuality: float = 0.3,
+        source_char_limit: int = 380,
+    ) -> Dict[str, Any]:
         """
-        执行 RAG 查询并返回结果。
-
-        :param question: 用户提出的问题
-        :param k: 检索返回的文档数量
-        :param mutuality: 相似度阈值（分数阈值）
-        :return: 查询结果（生成的答案）
+        Run the RAG pipeline and also return lightweight source snippets for UI display.
+        This implementation uses a two-step retrieval process for SQLite sources.
         """
-        # 获取检索器
-        retriever = self.get_retriever(k, mutuality)
+        # Step 1: Retrieve relevant table schemas
+        schema_retriever = self.get_retriever(
+            k=5, search_kwargs={"filter": {"type": "schema"}}
+        )
+        schema_docs = self._fetch_docs(schema_retriever, question)
+        
+        table_sources = [
+            doc.metadata["source"] for doc in schema_docs if "sqlite" in doc.metadata.get("source", "")
+        ]
 
-        # 获取 RAG 查询链
-        rag_chain = self.get_chain(retriever)
+        # Step 2: Retrieve data from the identified tables or fallback to general search
+        if table_sources:
+            logging.info(f"Found relevant tables: {table_sources}")
+            # Deduplicate sources
+            table_sources = list(set(table_sources))
+            
+            data_retriever = self.get_retriever(
+                k=k,
+                mutuality=mutuality,
+                search_kwargs={"filter": {"source": {"$in": table_sources}}},
+            )
+            docs = self._fetch_docs(data_retriever, question)
+        else:
+            logging.info("No specific table schema found, falling back to general search.")
+            retriever = self.get_retriever(k, mutuality)
+            docs = self._fetch_docs(retriever, question)
 
-        # 执行查询并返回结果
-        return rag_chain.invoke(input=question)
+        # If threshold search returned nothing, retry with plain similarity to avoid over-filtering.
+        if not docs:
+            logging.warning(
+                "No docs found with threshold %s; retrying with plain similarity (k=%s).",
+                mutuality,
+                k,
+            )
+            similarity_retriever = self.get_retriever(k=k, mutuality=0)
+            docs = self._fetch_docs(similarity_retriever, question)
+
+        formatted_context = self.format_docs(docs)
+
+        chain = self.prompt | self.llm | StrOutputParser()
+        answer = chain.invoke({"question": question, "context": formatted_context})
+
+        sources: List[Dict[str, Any]] = []
+        for doc in docs:
+            preview = doc.page_content[:source_char_limit]
+            sources.append(
+                {
+                    "source": doc.metadata.get("source", "unknown"),
+                    "preview": preview,
+                }
+            )
+
+        return {
+            "answer": answer,
+            "sources": sources,
+            "question": question,
+            "hits": len(docs),
+        }

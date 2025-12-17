@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>金融问答 RAG 控制台</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap");
+
+      :root {
+        --bg: #0a101f;
+        --panel: rgba(18, 25, 42, 0.92);
+        --panel-strong: rgba(18, 25, 42, 0.98);
+        --border: #1e2b45;
+        --accent: #3ad996;
+        --accent-2: #5ea6ff;
+        --text: #e9edf5;
+        --muted: #8a95ad;
+        --shadow: 0 18px 50px rgba(0, 0, 0, 0.3);
+        --radius: 14px;
+        --glass: blur(12px);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: radial-gradient(140% 140% at 10% 20%, #13203c 0%, #090f1c 50%, #050812 100%);
+        color: var(--text);
+        font-family: "Space Grotesk", "Segoe UI", "Helvetica Neue", sans-serif;
+        min-height: 100vh;
+        padding: 32px 18px 42px;
+      }
+
+      .page {
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .hero {
+        background: linear-gradient(145deg, rgba(40, 63, 108, 0.6), rgba(24, 52, 49, 0.75));
+        border: 1px solid var(--border);
+        border-radius: calc(var(--radius) + 6px);
+        padding: 24px;
+        box-shadow: var(--shadow);
+        display: grid;
+        gap: 16px;
+      }
+
+      .hero-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .title {
+        font-size: 22px;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+      }
+
+      .subtitle {
+        color: var(--muted);
+        font-size: 14px;
+        margin-top: 6px;
+      }
+
+      .chips {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .chip {
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 999px;
+        color: var(--text);
+        font-size: 13px;
+      }
+
+      .grid {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 18px;
+        box-shadow: var(--shadow);
+        backdrop-filter: var(--glass);
+      }
+
+      .panel h3 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+        letter-spacing: 0.2px;
+      }
+
+      .panel p {
+        margin: 0 0 10px 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .controls {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-top: 4px;
+      }
+
+      .switcher {
+        display: inline-flex;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .switcher button {
+        border: none;
+        padding: 10px 16px;
+        background: transparent;
+        color: var(--text);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-weight: 500;
+      }
+
+      .switcher button.active {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #07101f;
+      }
+
+      .switcher button:not(.active):hover {
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .pill {
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .input {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 12px;
+        font-size: 14px;
+        outline: none;
+        transition: border 0.2s ease, box-shadow 0.2s ease;
+      }
+
+      .input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px rgba(58, 217, 150, 0.3);
+      }
+
+      textarea.input {
+        min-height: 150px;
+        resize: vertical;
+      }
+
+      .button {
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border: none;
+        color: #0a101f;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        box-shadow: 0 10px 24px rgba(58, 217, 150, 0.25);
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+      }
+
+      .button:active {
+        transform: translateY(0);
+      }
+
+      .button.secondary {
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+        box-shadow: none;
+      }
+
+      .button[disabled] {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .question-list {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+        max-height: 420px;
+        overflow: auto;
+        padding-right: 4px;
+      }
+
+      .question-card {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+        transition: border 0.2s ease, transform 0.2s ease, background 0.2s ease;
+      }
+
+      .question-card:hover {
+        border-color: rgba(255, 255, 255, 0.16);
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .question-card .meta {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .answer-panel {
+        margin-top: 16px;
+      }
+
+      .answer-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .answer-box {
+        margin-top: 10px;
+        padding: 14px;
+        background: var(--panel-strong);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        min-height: 120px;
+        white-space: pre-wrap;
+        line-height: 1.6;
+        color: var(--text);
+      }
+
+      .sources {
+        margin-top: 12px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .source-item {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .source-item .label {
+        color: var(--muted);
+        font-size: 12px;
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .tag {
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.06);
+        font-size: 12px;
+        color: var(--text);
+      }
+
+      .error {
+        border: 1px solid #f27373;
+        color: #f9b1b1;
+        background: rgba(242, 115, 115, 0.08);
+        padding: 10px 12px;
+        border-radius: 10px;
+        margin-top: 10px;
+      }
+
+      .loader {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.25);
+        border-top-color: var(--accent);
+        animation: spin 1s linear infinite;
+        display: inline-block;
+        vertical-align: middle;
+      }
+
+      .range-row {
+        display: grid;
+        grid-template-columns: 1fr 80px;
+        gap: 10px;
+        align-items: center;
+      }
+
+      input[type="range"] {
+        width: 100%;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (max-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app" class="page">
+      <section class="hero">
+        <div class="hero-top">
+          <div>
+            <div class="title">金融问答 · RAG 控制台</div>
+            <div class="subtitle">
+              选择预置问题或直接发问，切换本地/远程 LLM，快速查看答案与来源。
+            </div>
+          </div>
+          <div class="chips">
+            <span class="chip">预置问题 {{ questionTotalLabel }}</span>
+            <span class="chip" v-if="status">默认后端 {{ status.default_backend }}</span>
+            <span class="chip">Chroma 集合 {{ status?.collection || 'langchain' }}</span>
+          </div>
+        </div>
+        <div class="controls">
+          <div class="switcher">
+            <button
+              :class="{ active: backend === 'local' }"
+              @click="backend = 'local'"
+            >
+              本地模型
+            </button>
+            <button
+              :class="{ active: backend === 'qwen' }"
+              @click="backend = 'qwen'"
+            >
+              远程 LLM
+            </button>
+          </div>
+          <span class="pill">Top K: {{ k }}</span>
+          <span class="pill">相似度阈值: {{ mutuality }}</span>
+          <button class="button secondary" @click="ask" :disabled="!canAsk">
+            <span v-if="loading" class="loader"></span>
+            <span v-else>立即提问</span>
+          </button>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="panel">
+          <h3>挑选预置问题</h3>
+          <p>question.json 中的样例，用于快速验证检索效果。</p>
+          <div class="controls">
+            <input
+              class="input"
+              type="search"
+              v-model="search"
+              placeholder="按关键词搜索预置问题"
+              @keyup.enter="fetchQuestions(true)"
+            />
+            <button class="button secondary" @click="fetchQuestions(true)">
+              {{ fetchingQuestions ? '加载中...' : '搜索 / 刷新' }}
+            </button>
+            <button class="button secondary" @click="nextPage" :disabled="fetchingQuestions">
+              换一组
+            </button>
+          </div>
+          <div class="question-list">
+            <div
+              class="question-card"
+              v-for="item in questions"
+              :key="item.id"
+            >
+              <div class="meta">#{{ item.id }}</div>
+              <div>{{ item.question }}</div>
+              <div class="controls">
+                <button class="button secondary" @click="useQuestion(item)">
+                  填入
+                </button>
+                <span class="pill">复制后可微调</span>
+              </div>
+            </div>
+            <div v-if="!questions.length && !fetchingQuestions" class="meta">
+              question.json 未找到或解析为空。
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h3>自定义提问</h3>
+          <p>支持直接提问，也可在左侧选择预置问题后再修改。</p>
+          <textarea
+            class="input"
+            v-model="question"
+            placeholder="输入问题，按 Enter 发送或点击下方按钮"
+            @keyup.enter.exact.prevent="ask"
+          ></textarea>
+          <div class="controls" style="margin-top: 10px;">
+            <div class="range-row">
+              <label class="pill">Top K (1-10)</label>
+              <input type="range" min="1" max="10" v-model.number="k" />
+            </div>
+            <div class="range-row">
+              <label class="pill">相似度阈值 (0-1)</label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                v-model.number="mutuality"
+              />
+            </div>
+          </div>
+          <div class="controls" style="margin-top: 12px;">
+            <button class="button" @click="ask" :disabled="!canAsk">
+              <span v-if="loading" class="loader"></span>
+              <span v-else>发送</span>
+            </button>
+            <button class="button secondary" @click="clearQuestion">清空</button>
+          </div>
+          <div v-if="error" class="error">{{ error }}</div>
+        </section>
+      </div>
+
+      <section class="panel answer-panel">
+        <div class="answer-header">
+          <h3>答案与来源</h3>
+          <div class="chips">
+            <span class="chip">后端: {{ backendLabel }}</span>
+            <span class="chip">命中: {{ hits }}</span>
+          </div>
+        </div>
+        <div class="answer-box" v-if="loading">
+          <span class="loader"></span> 正在生成...
+        </div>
+        <div class="answer-box" v-else-if="answer">
+          {{ answer }}
+        </div>
+        <div class="answer-box" v-else>
+          还没有回答，先在上方输入或选择一个问题。
+        </div>
+        <div class="sources" v-if="sources.length">
+          <div class="source-item" v-for="(src, idx) in sources" :key="idx">
+            <div class="label">
+              <span class="tag">来源</span>
+              <span>{{ src.source }}</span>
+            </div>
+            <div>{{ src.preview }}</div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script type="module">
+      import { createApp } from "https://unpkg.com/vue@3/dist/vue.esm-browser.js";
+
+      createApp({
+        data() {
+          return {
+            backend: "local",
+            question: "",
+            questionId: null,
+            answer: "",
+            sources: [],
+            hits: 0,
+            loading: false,
+            error: "",
+            search: "",
+            questions: [],
+            questionTotal: 0,
+            status: null,
+            limit: 12,
+            offset: 0,
+            k: 4,
+            mutuality: 0.3,
+            fetchingQuestions: false,
+          };
+        },
+        computed: {
+          canAsk() {
+            return this.question.trim().length > 0 && !this.loading;
+          },
+          backendLabel() {
+            return this.backend === "local" ? "本地模型" : "远程 LLM";
+          },
+          questionTotalLabel() {
+            return this.questionTotal ? `${this.questionTotal} 条` : "未加载";
+          },
+        },
+        methods: {
+          async fetchStatus() {
+            try {
+              const res = await fetch("/api/status");
+              if (!res.ok) return;
+              const data = await res.json();
+              this.status = data;
+              this.questionTotal = data.question_total || 0;
+              this.backend = data.default_backend || this.backend;
+              this.status.collection = data.collection_name || "langchain";
+            } catch (err) {
+              console.warn("status fetch failed", err);
+            }
+          },
+          async fetchQuestions(reset = false) {
+            if (reset) {
+              this.offset = 0;
+            }
+            this.fetchingQuestions = true;
+            try {
+              const params = new URLSearchParams({
+                limit: this.limit,
+                offset: this.offset,
+              });
+              if (this.search.trim()) {
+                params.set("q", this.search.trim());
+              }
+              const res = await fetch(`/api/questions?${params.toString()}`);
+              const data = await res.json();
+              this.questions = data.items || [];
+              this.questionTotal = data.total || this.questionTotal;
+            } catch (err) {
+              console.error(err);
+            } finally {
+              this.fetchingQuestions = false;
+            }
+          },
+          nextPage() {
+            this.offset = this.offset + this.limit;
+            if (this.offset >= this.questionTotal) {
+              this.offset = 0;
+            }
+            this.fetchQuestions();
+          },
+          useQuestion(item) {
+            this.question = item.question;
+            this.questionId = item.id;
+          },
+          clearQuestion() {
+            this.question = "";
+            this.questionId = null;
+            this.answer = "";
+            this.sources = [];
+            this.hits = 0;
+            this.error = "";
+          },
+          async ask() {
+            if (!this.canAsk) return;
+            this.loading = true;
+            this.error = "";
+            this.answer = "";
+            this.sources = [];
+            this.hits = 0;
+            try {
+              const payload = {
+                question: this.question,
+                question_id: this.questionId,
+                backend: this.backend,
+                k: this.k,
+                mutuality: this.mutuality,
+              };
+              const res = await fetch("/api/ask", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+              const data = await res.json();
+              if (!res.ok) {
+                throw new Error(data.detail || "请求失败");
+              }
+              this.answer = data.answer || "";
+              this.sources = data.sources || [];
+              this.hits = data.hits || 0;
+            } catch (err) {
+              this.error = err.message || "提问失败，请检查服务日志。";
+            } finally {
+              this.loading = false;
+            }
+          },
+        },
+        mounted() {
+          this.fetchStatus();
+          this.fetchQuestions(true);
+        },
+      }).mount("#app");
+    </script>
+  </body>
+</html>

@@ -1,127 +1,121 @@
-import os  # 文件操作相关模块
-import logging  # 日志记录模块
-import time  # 时间操作模块
-from tqdm import tqdm  # 进度条显示模块
-from langchain_community.document_loaders import PyMuPDFLoader  # PDF文件加载器
-from langchain_text_splitters import RecursiveCharacterTextSplitter  # 文本切分工具
-from rag.chroma_conn import ChromaDB  # 自定义的ChromaDB类
+import logging
+import os
+import time
+from pathlib import Path
+
+from tqdm import tqdm
+from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from rag.chroma_conn import ChromaDB
+
 
 class PDFProcessor:
     """
-    PDFProcessor 类用于处理PDF文件并将其内容存储到ChromaDB中。
+    Load PDF (or cached TXT) files, chunk them, and push into ChromaDB.
     """
 
-    def __init__(self,
-                 directory,  # PDF文件所在目录
-                 chroma_server_type,  # ChromaDB服务器类型（"local" 或 "http"）
-                 persist_path,  # ChromaDB持久化路径
-                 embed):  # 向量化函数
+    def __init__(
+        self,
+        directory: str,
+        chroma_server_type: str,
+        persist_path: str,
+        embed,
+        collection_name: str = "langchain",
+        text_directory: str | None = None,
+    ) -> None:
+        self.directory = directory
+        self.text_directory = text_directory
+        self.file_group_num = 80
+        self.batch_num = 64
+        self.chunksize = 1500
+        self.overlap = 100
 
-        self.directory = directory  # PDF文件存放目录
-        self.file_group_num = 80  # 每组处理的文件数
-        self.batch_num = 6  # 每次插入的批次数量
+        self.chroma_db = ChromaDB(
+            chroma_server_type=chroma_server_type,
+            persist_path=persist_path,
+            collection_name=collection_name,
+            embed=embed,
+        )
 
-        self.chunksize = 500  # 切分文本的大小
-        self.overlap = 100  # 切分文本的重叠大小
-
-        # 初始化ChromaDB对象
-        self.chroma_db = ChromaDB(chroma_server_type=chroma_server_type,
-                                  persist_path=persist_path,
-                                  embed=embed)
-
-        # 配置日志
         logging.basicConfig(
-            level=logging.INFO,  # 设置日志级别为INFO
-            format='%(asctime)s - %(levelname)s - %(message)s',  # 日志格式
-            datefmt='%Y-%m-%d %H:%M:%S'  # 时间格式
+            level=logging.INFO,
+            format="%(asctime)s - %(levelname)s - %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
         )
 
     def load_pdf_files(self):
-        """
-        加载指定目录下的所有PDF文件。
-        """
         pdf_files = []
-        for file in os.listdir(self.directory):  # 遍历目录中的所有文件
-            if file.lower().endswith('.pdf'):  # 筛选PDF文件
-                pdf_files.append(os.path.join(self.directory, file))  # 构建完整路径
+        for file in os.listdir(self.directory):
+            if file.lower().endswith(".pdf"):
+                pdf_files.append(os.path.join(self.directory, file))
 
-        logging.info(f"Found {len(pdf_files)} PDF files.")  # 记录日志
+        logging.info("Found %s PDF files.", len(pdf_files))
         return pdf_files
 
     def load_pdf_content(self, pdf_path):
         """
-        使用PyMuPDFLoader读取PDF文件的内容。
+        Prefer cached TXT (much faster) when available, fall back to parsing PDF.
         """
-        pdf_loader = PyMuPDFLoader(file_path=pdf_path)  # 创建PDF加载器
-        docs = pdf_loader.load()  # 加载PDF内容
-        logging.info(f"Loading content from {pdf_path}.")  # 记录日志
-        return docs
+        base_name = Path(pdf_path).stem
+        if self.text_directory:
+            txt_path = Path(self.text_directory) / f"{base_name}.txt"
+            if txt_path.exists():
+                logging.info("Loading cached txt for %s", base_name)
+                loader = TextLoader(str(txt_path), autodetect_encoding=True)
+                return loader.load()
+
+        logging.info("Parsing PDF directly for %s", base_name)
+        pdf_loader = PyMuPDFLoader(file_path=pdf_path)
+        return pdf_loader.load()
 
     def split_text(self, documents):
-        """
-        使用RecursiveCharacterTextSplitter将文档切分为小段。
-        """
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=self.chunksize,  # 每段文本的最大长度
-            chunk_overlap=self.overlap,  # 段与段之间的重叠长度
-            length_function=len,  # 使用字符串长度作为分割依据
-            add_start_index=True,  # 添加起始索引信息
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunksize,
+            chunk_overlap=self.overlap,
+            length_function=len,
+            add_start_index=True,
         )
-        docs = text_splitter.split_documents(documents)  # 切分文档
-        logging.info("Split text into smaller chunks with RecursiveCharacterTextSplitter.")  # 记录日志
+        docs = splitter.split_documents(documents)
+        logging.info("Split text into %s chunks.", len(docs))
         return docs
 
-    def insert_docs_chromadb(self, docs, batch_size=6):
-        """
-        将文档分批插入到ChromaDB中。
-        """
-        logging.info(f"Inserting {len(docs)} documents into ChromaDB.")  # 记录日志
+    def insert_docs_chromadb(self, docs, batch_size=64):
+        logging.info("Inserting %s documents into ChromaDB.", len(docs))
 
-        start_time = time.time()  # 记录开始时间
-        total_docs_inserted = 0  # 已插入的文档总数
-
-        # 计算总批次
+        start_time = time.time()
+        total_docs_inserted = 0
         total_batches = (len(docs) + batch_size - 1) // batch_size
 
-        # 使用tqdm显示进度条
         with tqdm(total=total_batches, desc="Inserting batches", unit="batch") as pbar:
             for i in range(0, len(docs), batch_size):
-                batch = docs[i:i + batch_size]  # 获取当前批次的文档
-                self.chroma_db.add_with_langchain(batch)  # 插入到ChromaDB
-                total_docs_inserted += len(batch)  # 更新已插入的文档数量
+                batch = docs[i : i + batch_size]
+                self.chroma_db.add_with_langchain(batch)
+                total_docs_inserted += len(batch)
 
-                # 计算TPM（每分钟插入的文档数）
                 elapsed_time = time.time() - start_time
-                if elapsed_time > 0:  # 防止除以零
+                if elapsed_time > 0:
                     tpm = (total_docs_inserted / elapsed_time) * 60
-                    pbar.set_postfix({"TPM": f"{tpm:.2f}"})  # 更新进度条的后缀信息
+                    pbar.set_postfix({"TPM": f"{tpm:.2f}"})
 
-                pbar.update(1)  # 更新进度条
+                pbar.update(1)
 
     def process_pdfs_group(self, pdf_files_group):
-        """
-        处理一组PDF文件，包括加载内容、切分文本和插入数据库。
-        """
-        pdf_contents = []  # 存储所有PDF文件的内容
+        pdf_contents = []
 
         for pdf_path in pdf_files_group:
-            documents = self.load_pdf_content(pdf_path)  # 加载PDF内容
-            pdf_contents.extend(documents)  # 将内容添加到列表中
+            documents = self.load_pdf_content(pdf_path)
+            pdf_contents.extend(documents)
 
-        docs = self.split_text(pdf_contents)  # 切分文本
-        self.insert_docs_chromadb(docs, self.batch_num)  # 插入到ChromaDB
+        docs = self.split_text(pdf_contents)
+        self.insert_docs_chromadb(docs, self.batch_num)
 
     def process_pdfs(self):
-        """
-        批量处理目录下的所有PDF文件。
-        """
-        pdf_files = self.load_pdf_files()  # 加载所有PDF文件
+        pdf_files = self.load_pdf_files()
+        group_num = self.file_group_num
 
-        group_num = self.file_group_num  # 每组处理的文件数
-
-        # 按组处理PDF文件
         for i in range(0, len(pdf_files), group_num):
-            pdf_files_group = pdf_files[i:i + group_num]
+            pdf_files_group = pdf_files[i : i + group_num]
             self.process_pdfs_group(pdf_files_group)
 
-        print("PDFs processed successfully!")  # 提示处理完成
+        print("PDFs processed successfully!")

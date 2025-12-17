@@ -1,36 +1,117 @@
-def test_rag():
+import os
+from pathlib import Path
+
+from rag.rag import RagManager
+from rag.pdf_processor import PDFProcessor
+from rag.sqlite_processor import SQLiteProcessor
+from utils.util import get_model_bundle
+
+CHROMA_PERSIST_PATH = os.getenv("CHROMA_PERSIST_PATH", "dataset/chroma_db")
+CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION", "langchain")
+CHROMA_SERVER_TYPE = os.getenv("CHROMA_SERVER_TYPE", "local")
+PDF_DIR = os.getenv("PDF_DIR", "dataset/pdf")
+PDF_TXT_DIR = os.getenv("PDF_TXT_DIR", "dataset/pdf_txt_file")
+SQLITE_PATH = os.getenv("SQLITE_PATH")  # resolved dynamically
+
+
+def _load_models():
+    llm, _chat, embed = get_model_bundle()
+    return llm, embed
+
+
+def _resolve_sqlite_path(override: str | None = None) -> Path:
     """
-    测试 RAG（检索增强生成）系统的主流程。
+    Resolve a usable SQLite path.
+    Priority:
+      1) explicit override
+      2) SQLITE_PATH env
+      3) first *.db under dataset/database
     """
-    # 导入 RagManager 类，用于管理和执行 RAG 查询任务
-    from rag.rag import RagManager
+    candidates: list[Path] = []
+    if override:
+        candidates.append(Path(override))
+    if SQLITE_PATH:
+        candidates.append(Path(SQLITE_PATH))
 
-    # 导入工具函数 get_qwen_models，用于获取通义千问的模型实例
-    from utils.util import get_qwen_models
+    db_root = Path("dataset") / "database"
+    if db_root.exists():
+        for db_file in sorted(db_root.glob("*.db")):
+            candidates.append(db_file)
 
-    # 获取通义千问的 LLM、Chat 和 Embedding 模型
-    llm, chat, embed = get_qwen_models()
+    for path in candidates:
+        if path.exists():
+            return path
 
-    # 创建 RagManager 实例，用于管理 RAG 系统
-    # 参数说明：
-    # - host: ChromaDB HTTP 服务器地址
-    # - port: ChromaDB HTTP 服务器端口
-    # - llm: 大语言模型（LLM）
-    # - embed: 嵌入模型（Embedding Model）
-    rag = RagManager(host="localhost", port=8000, llm=llm, embed=embed)
+    raise FileNotFoundError(
+        "No SQLite db found. Set SQLITE_PATH or place a .db file under dataset/database/."
+    )
 
-    # 执行 RAG 查询，传入用户提出的问题
-    question = "景顺长城中短债债券C基金在20210331的季报里，前三大持仓占比的债券名称是什么?"
-    result = rag.get_result(question)
 
-    # 输出查询结果
+def test_rag(question: str | None = None):
+    llm, embed = _load_models()
+    rag = RagManager(
+        chroma_server_type=CHROMA_SERVER_TYPE,
+        persist_path=CHROMA_PERSIST_PATH,
+        collection_name=CHROMA_COLLECTION,
+        llm=llm,
+        embed=embed,
+    )
+
+    query = question
+    result = rag.get_result(query)
     print(result)
 
 
-if __name__ == "__main__":
-    # 执行 RAG 测试函数
-    test_rag()
+def import_pdfs(
+    directory: str | None = None,
+    text_directory: str | None = PDF_TXT_DIR,
+):
+    _llm, embed = _load_models()
+    pdf_processor = PDFProcessor(
+        directory=directory or PDF_DIR,
+        chroma_server_type=CHROMA_SERVER_TYPE,
+        persist_path=CHROMA_PERSIST_PATH,
+        collection_name=CHROMA_COLLECTION,
+        embed=embed,
+        text_directory=text_directory,
+    )
+    pdf_processor.process_pdfs()
 
-    # 批量导入 PDF 测试函数（可选）
-    # 如果需要测试 PDF 文件批量导入功能，请取消以下行的注释
-    # test_import()
+
+def import_sqlite(
+    db_path: str | None = None,
+    tables: list[str] | None = None,
+    row_limit: int | None = None,
+):
+    _llm, embed = _load_models()
+
+    resolved_path = _resolve_sqlite_path(db_path)
+    effective_row_limit = row_limit
+    if effective_row_limit is None:
+        env_limit = os.getenv("SQLITE_ROW_LIMIT")
+        if env_limit:
+            try:
+                effective_row_limit = int(env_limit)
+            except ValueError:
+                effective_row_limit = None
+
+    fetch_batch = int(os.getenv("SQLITE_FETCH_BATCH", "2000"))
+    rows_per_doc = int(os.getenv("SQLITE_ROWS_PER_DOC", "20"))
+    insert_batch = int(os.getenv("SQLITE_INSERT_BATCH", "64"))
+
+    processor = SQLiteProcessor(
+        db_path=str(resolved_path),
+        chroma_server_type=CHROMA_SERVER_TYPE,
+        persist_path=CHROMA_PERSIST_PATH,
+        collection_name=CHROMA_COLLECTION,
+        embed=embed,
+        fetch_batch=fetch_batch,
+        rows_per_doc=rows_per_doc,
+        insert_batch_size=insert_batch,
+        row_limit=effective_row_limit,
+    )
+    processor.process(tables=tables)
+
+
+if __name__ == "__main__":
+    test_rag()
