@@ -1,19 +1,3 @@
----
-license: Apache License 2.0
-text:
-  table-question-answering:
-    language:
-      - zh
-  question-answering:
-    language:
-      - zh
-tags:
-  - Qianwen
-  - Bosera
----
-<p align="center">
-  <img src="./img/1.png" alt="BOSERA BIG CHALLENGE" width="50%">
-</p>
 
 ## 数据集描述
 赛事主办方提供三类数据。一个是10张数据表，一个是招股说明书，以及将招股说明书pdf解析后的txt文件。 
@@ -48,33 +32,4 @@ tags:
 - 文件格式：txt文件
 - 文件数量：80
 
-#### 初赛问题
-- 文件名：question.json
 
-
-## 数据集的格式和结构
-
-### 数据集加载方式
-#### git Clone with HTTP
-```bash 
-# 要求安装 git lfs
-git clone https://www.modelscope.cn/datasets/BJQW14B/bs_challenge_financial_14b_dataset.git
-```
-
-#### 读取问题文件
-```python
-import jsonlines
-
-def read_jsonl(path):
-    content = []
-    with jsonlines.open(path, "r") as json_file:
-        for obj in json_file.iter(type=dict, skip_invalid=True):
-            content.append(obj)
-    return content
-
-question = read_jsonl('./question.json')
-```
-
-
-## 数据集版权信息
-数据集已经开源，license为Apache License 2.0，如有违反相关条款，随时联系删除。
